@@ -27,6 +27,14 @@ using namespace DirectX;
 struct SimpleVertex
 {
 	XMFLOAT3 Pos;
+	XMFLOAT4 Color;
+};
+
+struct ConstantBuffer
+{
+	XMMATRIX mWorld;
+	XMMATRIX mView;
+	XMMATRIX mProjection;
 };
 
 //--------------------------------------------------------------------------------------
@@ -43,7 +51,15 @@ ID3D11DeviceContext1*   g_pImmediateContext1 = nullptr;
 IDXGISwapChain*         g_pSwapChain = nullptr;
 IDXGISwapChain1*        g_pSwapChain1 = nullptr;
 ID3D11RenderTargetView* g_pRenderTargetView = nullptr;
-
+ID3D11VertexShader*     g_pVertexShader = nullptr;
+ID3D11PixelShader*      g_pPixelShader = nullptr;
+ID3D11InputLayout*      g_pVertexLayout = nullptr;
+ID3D11Buffer*           g_pVertexBuffer = nullptr;
+ID3D11Buffer*           g_pIndexBuffer = nullptr;
+ID3D11Buffer*           g_pConstantBuffer = nullptr;
+XMMATRIX                g_World;
+XMMATRIX                g_View;
+XMMATRIX                g_Projection;
 
 //--------------------------------------------------------------------------------------
 // Forward declarations
