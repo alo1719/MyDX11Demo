@@ -26,7 +26,7 @@ using namespace DirectX;
 struct SimpleVertex
 {
 	XMFLOAT3 Pos;
-	//XMFLOAT2 Tex;
+	XMFLOAT2 Tex;
 };
 
 struct CBNeverChanges
@@ -349,6 +349,34 @@ HRESULT InitDevice()
 
 	g_pImmediateContext->OMSetRenderTargets(1, &g_pRenderTargetView, nullptr);
 
+	// Create depth stencil texture
+	D3D11_TEXTURE2D_DESC descDepth = {};
+	descDepth.Width = width;
+	descDepth.Height = height;
+	descDepth.MipLevels = 1;
+	descDepth.ArraySize = 1;
+	descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	descDepth.SampleDesc.Count = 1;
+	descDepth.SampleDesc.Quality = 0;
+	descDepth.Usage = D3D11_USAGE_DEFAULT;
+	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	descDepth.CPUAccessFlags = 0;
+	descDepth.MiscFlags = 0;
+	hr = g_pd3dDevice->CreateTexture2D(&descDepth, nullptr, &g_pDepthStencil);
+	if (FAILED(hr))
+		return hr;
+
+	// Create the depth stencil view
+	D3D11_DEPTH_STENCIL_VIEW_DESC descDSV = {};
+	descDSV.Format = descDepth.Format;
+	descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	descDSV.Texture2D.MipSlice = 0;
+	hr = g_pd3dDevice->CreateDepthStencilView(g_pDepthStencil, &descDSV, &g_pDepthStencilView);
+	if (FAILED(hr))
+		return hr;
+
+	g_pImmediateContext->OMSetRenderTargets(1, &g_pRenderTargetView, g_pDepthStencilView);
+
 	// Setup the viewport
 	D3D11_VIEWPORT vp;
 	vp.Width = (FLOAT)width;
@@ -381,6 +409,7 @@ HRESULT InitDevice()
 	D3D11_INPUT_ELEMENT_DESC layout[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 	UINT numElements = ARRAYSIZE(layout);
 
@@ -413,13 +442,13 @@ HRESULT InitDevice()
 	// Create vertex buffer
 	SimpleVertex vertices[] =
 	{
-		XMFLOAT3( 0.0f, 0.5f, 0.5f),
-		XMFLOAT3( 0.5f, -0.5f, 0.5f),
-		XMFLOAT3( -0.5f, -0.5f, 0.5f),
+		{XMFLOAT3(0.0f, 0.5f, 0.5f), XMFLOAT2(1.0f, 0.0f)},
+		{XMFLOAT3( 0.5f, -0.5f, 0.5f), XMFLOAT2(0.0f, 0.0f)},
+		{XMFLOAT3( -0.5f, -0.5f, 0.5f), XMFLOAT2(0.0f, 1.0f)},
 	};
 	D3D11_BUFFER_DESC bd = {};
 	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(SimpleVertex) * 3;
+	bd.ByteWidth = sizeof(SimpleVertex) * 5;
 	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	bd.CPUAccessFlags = 0;
 
@@ -434,8 +463,25 @@ HRESULT InitDevice()
 	UINT offset = 0;
 	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
 
+	// Create index buffer
+	// Create vertex buffer
+	// Set index buffer
+
 	// Set primitive topology
 	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// Create the constant buffers 
+
+	// Load the Texture
+	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"seafloor.dds", nullptr, &g_pTextureRV);
+	if (FAILED(hr))
+		return hr;
+
+	// Create the sample state
+
+	// Initialize the world matrices
+	// Initialize the view matrix
+	// Initialize the projection matrix
 
 	return S_OK;
 }
@@ -447,19 +493,27 @@ HRESULT InitDevice()
 //--------------------------------------------------------------------------------------
 void CleanupDevice()
 {
-    if( g_pImmediateContext ) g_pImmediateContext->ClearState();
+	if (g_pImmediateContext) g_pImmediateContext->ClearState();
 
+	if (g_pSamplerLinear) g_pSamplerLinear->Release();
+	if (g_pTextureRV) g_pTextureRV->Release();
+	if (g_pCBNeverChanges) g_pCBNeverChanges->Release();
+	if (g_pCBChangeOnResize) g_pCBChangeOnResize->Release();
+	if (g_pCBChangesEveryFrame) g_pCBChangesEveryFrame->Release();
 	if (g_pVertexBuffer) g_pVertexBuffer->Release();
+	if (g_pIndexBuffer) g_pIndexBuffer->Release();
 	if (g_pVertexLayout) g_pVertexLayout->Release();
 	if (g_pVertexShader) g_pVertexShader->Release();
 	if (g_pPixelShader) g_pPixelShader->Release();
-    if( g_pRenderTargetView ) g_pRenderTargetView->Release();
-    if( g_pSwapChain1 ) g_pSwapChain1->Release();
-    if( g_pSwapChain ) g_pSwapChain->Release();
-    if( g_pImmediateContext1 ) g_pImmediateContext1->Release();
-    if( g_pImmediateContext ) g_pImmediateContext->Release();
-    if( g_pd3dDevice1 ) g_pd3dDevice1->Release();
-    if( g_pd3dDevice ) g_pd3dDevice->Release();
+	if (g_pDepthStencil) g_pDepthStencil->Release();
+	if (g_pDepthStencilView) g_pDepthStencilView->Release();
+	if (g_pRenderTargetView) g_pRenderTargetView->Release();
+	if (g_pSwapChain1) g_pSwapChain1->Release();
+	if (g_pSwapChain) g_pSwapChain->Release();
+	if (g_pImmediateContext1) g_pImmediateContext1->Release();
+	if (g_pImmediateContext) g_pImmediateContext->Release();
+	if (g_pd3dDevice1) g_pd3dDevice1->Release();
+	if (g_pd3dDevice) g_pd3dDevice->Release();
 }
 
 
@@ -500,12 +554,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 //--------------------------------------------------------------------------------------
 void Render()
 {
-	// Just clear the backbuffer
+	// Update our time
+
+	// Clear the back buffer
 	g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, Colors::MidnightBlue);
+
+	// Clear the depth buffer to 1.0 (max depth)
+	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 	// Render a triangle
 	g_pImmediateContext->VSSetShader(g_pVertexShader, nullptr, 0);
 	g_pImmediateContext->PSSetShader(g_pPixelShader, nullptr, 0);
+	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
+	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
 	g_pImmediateContext->Draw(3, 0);
 
 	// Present the information rendered to the back buffer to the front buffer (the screen)
